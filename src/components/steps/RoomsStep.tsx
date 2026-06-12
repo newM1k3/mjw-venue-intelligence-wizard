@@ -1,9 +1,11 @@
-import { ArrowLeft, ArrowRight, Plus, Trash2 } from 'lucide-react';
-import type { VenueRoom } from '../../lib/types';
+import { ArrowLeft, ArrowRight, Info, Plus, Trash2 } from 'lucide-react';
+import type { BookingDetection, VenueRoom } from '../../lib/types';
 import { Button, Field, TextArea, TextInput } from '../ui';
 
 interface Props {
   rooms: VenueRoom[];
+  booking?: BookingDetection;
+  autoDetected: boolean;
   onChange: (rooms: VenueRoom[]) => void;
   onBack: () => void;
   onNext: () => void;
@@ -17,7 +19,7 @@ const blankRoom: VenueRoom = {
   capacityMax: 6,
 };
 
-export default function RoomsStep({ rooms, onChange, onBack, onNext }: Props) {
+export default function RoomsStep({ rooms, booking, autoDetected, onChange, onBack, onNext }: Props) {
   const setRoom = (i: number, patch: Partial<VenueRoom>) =>
     onChange(rooms.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   const removeRoom = (i: number) => onChange(rooms.filter((_, idx) => idx !== i));
@@ -29,11 +31,35 @@ export default function RoomsStep({ rooms, onChange, onBack, onNext }: Props) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold">Confirm your rooms</h2>
+        <h2 className="text-lg font-semibold">{autoDetected ? 'Confirm your rooms' : 'Add your rooms'}</h2>
         <p className="mt-1 text-sm text-slate-400">
-          {rooms.length} room{rooms.length === 1 ? '' : 's'} detected. Add, edit, or remove as needed.
+          {autoDetected
+            ? `${rooms.length} room${rooms.length === 1 ? '' : 's'} detected. Add, edit, or remove as needed.`
+            : 'You know your rooms best — add them here. It only takes a minute.'}
         </p>
       </div>
+
+      {!autoDetected && (
+        <div className="flex gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200">
+          <Info size={16} className="mt-0.5 shrink-0" />
+          <div>
+            {booking?.detected ? (
+              <>
+                We couldn't read your rooms automatically — they're managed in{' '}
+                <span className="font-medium">{booking?.name}</span>, which our scan can't see inside.
+                Add them below. Tip: go back and paste your {booking?.name} booking page URL to try
+                auto-filling.
+              </>
+            ) : (
+              <>
+                We couldn't read your rooms automatically — they're often inside a booking widget our
+                scan can't see into. Add them below, or go back and paste your booking page URL under
+                "Advanced".
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {rooms.map((room, i) => (

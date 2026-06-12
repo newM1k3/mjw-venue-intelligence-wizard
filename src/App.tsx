@@ -40,12 +40,14 @@ export default function App() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [result, setResult] = useState<SeedResult | null>(null);
 
-  async function handleScan(url: string) {
+  async function handleScan(url: string, roomsUrl?: string) {
     setScanning(true);
     setScanError(null);
     try {
-      const data = await scrapeVenue(url);
-      // Guarantee at least one editable room so the operator is never stuck.
+      const data = await scrapeVenue(url, roomsUrl);
+      // roomsAutoDetected reflects whether the scan actually found rooms; preserve
+      // it before we add an empty placeholder so the operator is never stuck.
+      data.roomsAutoDetected = data.rooms.length > 0;
       if (data.rooms.length === 0) data.rooms = [{ ...emptyRoom }];
       setIntel(data);
       setStep('venue');
@@ -98,6 +100,8 @@ export default function App() {
       {step === 'rooms' && intel && (
         <RoomsStep
           rooms={intel.rooms}
+          booking={intel.booking}
+          autoDetected={intel.roomsAutoDetected ?? false}
           onChange={(rooms) => setIntel({ ...intel, rooms })}
           onBack={() => setStep('venue')}
           onNext={() => setStep('review')}

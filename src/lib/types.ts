@@ -32,12 +32,26 @@ export interface VenueDetails {
   description: string;
 }
 
+/** A detected third-party booking platform (where room data often lives). */
+export interface BookingDetection {
+  /** True if a known booking widget/platform was found in the site's markup. */
+  detected: boolean;
+  /** Stable key, e.g. 'offthecouch'. null if none detected. */
+  key: string | null;
+  /** Human label, e.g. 'Off The Couch'. null if none detected. */
+  name: string | null;
+}
+
 /** Full payload the wizard works with through steps 2–4. */
 export interface VenueIntelligence {
   venue: VenueDetails;
   rooms: VenueRoom[];
   /** Free-form notes Claude couldn't confidently slot into a field. */
   notes?: string;
+  /** Booking platform detected in the site markup (rooms may live there). */
+  booking?: BookingDetection;
+  /** True when Claude extracted at least one real room from the page text. */
+  roomsAutoDetected?: boolean;
 }
 
 /** Shape returned by the /scrape-venue Netlify function. */

@@ -19,6 +19,29 @@ serverless function for scrape + Claude parse. Same conventions as `mjw-apps-das
 4. **Review** — preview exactly what will be written (`ReviewStep`).
 5. **Done** — records created; link back to the dashboard (`DoneStep`).
 
+## Booking widgets (room data the scraper can't see)
+
+Many venues list their rooms inside a third-party booking widget (Off The Couch,
+Bookeo, Resova, FareHarbor, etc.). That content is cross-origin and
+JavaScript-rendered, so a plain server-side fetch can't read the room names — only
+the venue-level info (name, description) comes back reliably.
+
+The wizard handles this gracefully rather than failing:
+
+- **Detection** — the function sniffs the raw markup for known booking platforms
+  (`BOOKING_PROVIDERS` in `scrape-venue.mjs`) and returns `booking: { detected,
+  key, name }`.
+- **Graceful fallback** — when no rooms are auto-detected, the Rooms step switches
+  to an "Add your rooms" prompt and, if a platform was detected, names it
+  ("…managed in Off The Couch, which our scan can't see inside").
+- **URL override** — step 1 has an "Advanced" field where the operator can paste
+  their rooms/booking page URL (`roomsUrl`); the function fetches that page too
+  (cross-origin is allowed since it's explicit) and feeds it to Claude.
+
+**Reliable fix for Off The Couch venues:** OTC has an API. A future enhancement is
+to pull rooms directly from it (needs an API key + endpoint), which would fully
+automate room extraction for OTC-hosted venues instead of relying on scraping.
+
 ## Auth
 
 `src/hooks/useAuth.ts` implements the standard ImmersiveKit SSO token handoff

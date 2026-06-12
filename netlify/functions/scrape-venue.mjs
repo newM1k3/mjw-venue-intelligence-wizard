@@ -43,11 +43,37 @@ const KEYWORDS = [
   ['book', 1],
 ];
 
+// Known booking platforms — matched (as substrings) against the raw site markup
+// (iframe/script/link/anchor URLs). Rooms frequently live inside these widgets,
+// which a plain fetch can't read, so we at least detect and report them.
+const BOOKING_PROVIDERS = [
+  { key: 'offthecouch', name: 'Off The Couch', signatures: ['offthecouch.io', 'offthecouch'] },
+  { key: 'bookeo', name: 'Bookeo', signatures: ['bookeo.com'] },
+  { key: 'resova', name: 'Resova', signatures: ['resova.com', 'resova.us', 'resova.io'] },
+  { key: 'fareharbor', name: 'FareHarbor', signatures: ['fareharbor.com'] },
+  { key: 'xola', name: 'Xola', signatures: ['xola.com'] },
+  { key: 'checkfront', name: 'Checkfront', signatures: ['checkfront.com'] },
+  { key: 'bookwhen', name: 'Bookwhen', signatures: ['bookwhen.com'] },
+  { key: 'peek', name: 'Peek', signatures: ['peek.com', 'book.peek'] },
+  { key: 'acuity', name: 'Acuity Scheduling', signatures: ['acuityscheduling.com', 'squarespace-scheduling'] },
+];
+
 const json = (statusCode, body) => ({
   statusCode,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
+
+/** Detect the first known booking platform referenced in the raw markup. */
+function detectBooking(rawMarkup) {
+  const hay = rawMarkup.toLowerCase();
+  for (const p of BOOKING_PROVIDERS) {
+    if (p.signatures.some((sig) => hay.includes(sig))) {
+      return { detected: true, key: p.key, name: p.name };
+    }
+  }
+  return { detected: false, key: null, name: null };
+}
 
 /** Very small HTML -> text reducer: drop scripts/styles and tags, collapse space. */
 function htmlToText(html) {
@@ -177,14 +203,27 @@ export async function handler(event) {
   }
 
   let url;
+  let roomsUrl;
   try {
-    ({ url } = JSON.parse(event.body || '{}'));
+    ({ url, roomsUrl } = JSON.parse(event.body || '{}'));
   } catch {
     return json(400, { ok: false, error: 'Invalid JSON body.' });
   }
 
   if (!url || typeof url !== 'string') {
     return json(400, { ok: false, error: 'Missing "url" in request body.' });
+  }
+
+  // Optional operator-provided rooms/booking page URL. Allowed to be cross-origin
+  // since the operator explicitly pointed us at it.
+  let roomsTarget = null;
+  if (roomsUrl && typeof roomsUrl === 'string' && roomsUrl.trim()) {
+    try {
+      roomsTarget = new URL(roomsUrl.startsWith('http') ? roomsUrl : `https://${roomsUrl}`);
+      if (!/^https?:$/.test(roomsTarget.protocol)) throw new Error('bad protocol');
+    } catch {
+      return json(400, { ok: false, error: `"${roomsUrl}" is not a valid rooms URL.` });
+    }
   }
 
   // Normalise + validate the URL.
@@ -212,13 +251,19 @@ export async function handler(event) {
   }
 
   // 2. Discover + fetch likely sub-pages (best-effort; failures are skipped).
+  //    If the operator gave an explicit rooms/booking URL, fetch that first.
   const subUrls = discoverSubpages(homeHtml, target);
-  const subHtmls = await Promise.all(subUrls.map((u) => fetchText(u)));
+  const fetchUrls = roomsTarget ? [roomsTarget.toString(), ...subUrls] : subUrls;
+  const fetchedHtmls = await Promise.all(fetchUrls.map((u) => fetchText(u)));
+
+  // Keep the raw markup of every page so we can sniff for booking widgets.
+  const rawMarkup = [homeHtml, ...fetchedHtmls.filter(Boolean)].join('\n');
+  const booking = detectBooking(rawMarkup);
 
   // 3. Build the combined, per-page-labelled text.
   const pages = [{ url: target.toString(), text: htmlToText(homeHtml) }];
-  subUrls.forEach((u, i) => {
-    const raw = subHtmls[i];
+  fetchUrls.forEach((u, i) => {
+    const raw = fetchedHtmls[i];
     if (raw) {
       const text = htmlToText(raw);
       if (text.length > 40) pages.push({ url: u, text });
@@ -290,6 +335,18 @@ export async function handler(event) {
 
   // 5. Normalise the shape so the client can trust it.
   const venue = data.venue || {};
+  const rooms = Array.isArray(data.rooms)
+    ? data.rooms
+        .map((r) => ({
+          title: String(r.title || '').trim(),
+          premise: String(r.premise || '').trim(),
+          durationMinutes: Number(r.durationMinutes) || 0,
+          capacityMin: Number(r.capacityMin) || 0,
+          capacityMax: Number(r.capacityMax) || 0,
+        }))
+        .filter((r) => r.title.length > 0)
+    : [];
+
   const normalized = {
     venue: {
       name: String(venue.name || '').trim(),
@@ -297,16 +354,10 @@ export async function handler(event) {
       website: target.toString(),
       description: String(venue.description || '').trim(),
     },
-    rooms: Array.isArray(data.rooms)
-      ? data.rooms.map((r) => ({
-          title: String(r.title || '').trim(),
-          premise: String(r.premise || '').trim(),
-          durationMinutes: Number(r.durationMinutes) || 0,
-          capacityMin: Number(r.capacityMin) || 0,
-          capacityMax: Number(r.capacityMax) || 0,
-        }))
-      : [],
+    rooms,
     notes: String(data.notes || '').trim(),
+    booking,
+    roomsAutoDetected: rooms.length > 0,
   };
 
   return json(200, { ok: true, data: normalized });

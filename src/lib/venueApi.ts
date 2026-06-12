@@ -4,13 +4,13 @@ import type { ScrapeVenueResponse, VenueIntelligence } from './types';
 // the function is served at /.netlify/functions/scrape-venue.
 const SCRAPE_ENDPOINT = '/.netlify/functions/scrape-venue';
 
-export async function scrapeVenue(url: string): Promise<VenueIntelligence> {
+export async function scrapeVenue(url: string, roomsUrl?: string): Promise<VenueIntelligence> {
   let res: Response;
   try {
     res = await fetch(SCRAPE_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, roomsUrl: roomsUrl?.trim() || undefined }),
     });
   } catch (err) {
     throw new Error(
