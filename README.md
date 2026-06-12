@@ -58,11 +58,13 @@ Confirmed from the live schema:
 
 - `EXPERIENCE_STATUS='live'` — `experiences.status` is required
   (`draft|review|approved|live|retired`). ✓
+- `MEMBERSHIP_ROLE='owner'` — `memberships.role` is required
+  (`owner|admin|producer|designer|viewer`). ✓
+- `MEMBERSHIP_STATUS='active'` — `memberships.status` is required
+  (`invited|active|disabled`). ✓
 
-Not yet confirmed (best-guess):
-
-- `MEMBERSHIP_ROLE='owner'`, `MEMBERSHIP_STATUS='active'` — verify against
-  `memberships` select options.
+All four collections (organizations, memberships, projects, experiences) and every
+required select are verified against the live schema as of June 2026.
 
 ## Local development
 
