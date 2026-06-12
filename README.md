@@ -11,7 +11,9 @@ serverless function for scrape + Claude parse. Same conventions as `mjw-apps-das
 ## The 5 steps
 
 1. **Website** — operator enters their site URL (`UrlEntryStep`). Submitting calls
-   the `scrape-venue` function.
+   the `scrape-venue` function, which fetches the homepage, discovers and follows up
+   to 4 likely rooms/experiences sub-pages (same-origin links scored on
+   room/escape/experience keywords), and sends the combined text to Claude.
 2. **Venue** — confirm/edit the extracted organization details (`VenueStep`).
 3. **Rooms** — confirm/edit/add/remove the extracted rooms (`RoomsStep`).
 4. **Review** — preview exactly what will be written (`ReviewStep`).
