@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { RecordModel } from 'pocketbase';
 import pb from '../lib/pocketbase';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,8 +31,13 @@ const MOCK_USER: AuthUser = {
   name: 'Demo Operator',
 };
 
-function toAuthUser(record: { id: string; email: string; name?: string }): AuthUser {
-  return { id: record.id, email: record.email, name: record.name };
+function toAuthUser(record: RecordModel): AuthUser {
+  const r = record as Record<string, unknown>;
+  return {
+    id: typeof r['id'] === 'string' ? r['id'] : '',
+    email: typeof r['email'] === 'string' ? r['email'] : '',
+    name: typeof r['name'] === 'string' ? r['name'] : undefined,
+  };
 }
 
 export function useAuth(): AuthState {
