@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { scrapeVenue } from './lib/venueApi';
 import { seedVenue } from './lib/seedPocketbase';
+import { isPlaceholderScan } from './lib/placeholderRooms';
 import type { SeedResult, VenueIntelligence, VenueRoom } from './lib/types';
 import WizardShell from './components/WizardShell';
 import UrlEntryStep from './components/steps/UrlEntryStep';
@@ -45,10 +46,11 @@ export default function App() {
     setScanError(null);
     try {
       const data = await scrapeVenue(url, roomsUrl);
-      // roomsAutoDetected reflects whether the scan actually found rooms; preserve
-      // it before we add an empty placeholder so the operator is never stuck.
-      data.roomsAutoDetected = data.rooms.length > 0;
-      if (data.rooms.length === 0) data.rooms = [{ ...emptyRoom }];
+      // Generic placeholders ("Escape Rooms (general)") count as "no real rooms"
+      // so the Rooms step surfaces its banner instead of pretending we got data.
+      const placeholder = isPlaceholderScan(data.rooms, data.notes);
+      data.roomsAutoDetected = data.rooms.length > 0 && !placeholder;
+      if (data.rooms.length === 0 || placeholder) data.rooms = [{ ...emptyRoom }];
       setIntel(data);
       setStep('venue');
     } catch (err) {

@@ -11,3 +11,6 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[functions."scrape-venue"]
+  timeout = 26

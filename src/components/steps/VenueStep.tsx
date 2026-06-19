@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import type { VenueDetails } from '../../lib/types';
 import { Button, Field, TextArea, TextInput } from '../ui';
@@ -10,8 +11,34 @@ interface Props {
   onNext: () => void;
 }
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
 export default function VenueStep({ venue, notes, onChange, onBack, onNext }: Props) {
+  // Track whether the user has manually edited the slug so we don't clobber
+  // their edit if they subsequently change the venue name.
+  const [slugTouched, setSlugTouched] = useState(false);
+
   const set = (patch: Partial<VenueDetails>) => onChange({ ...venue, ...patch });
+
+  const handleNameChange = (name: string) => {
+    if (slugTouched) {
+      set({ name });
+    } else {
+      set({ name, slug: slugify(name) });
+    }
+  };
+
+  const handleSlugChange = (slug: string) => {
+    setSlugTouched(true);
+    set({ slug });
+  };
+
   const canNext = venue.name.trim().length > 0 && venue.slug.trim().length > 0;
 
   return (
@@ -24,11 +51,17 @@ export default function VenueStep({ venue, notes, onChange, onBack, onNext }: Pr
       </div>
 
       <Field label="Venue name">
-        <TextInput value={venue.name} onChange={(e) => set({ name: e.target.value })} />
+        <TextInput
+          value={venue.name}
+          onChange={(e) => handleNameChange(e.target.value)}
+        />
       </Field>
 
       <Field label="Slug" hint="Lowercase, hyphenated. Used in URLs.">
-        <TextInput value={venue.slug} onChange={(e) => set({ slug: e.target.value })} />
+        <TextInput
+          value={venue.slug}
+          onChange={(e) => handleSlugChange(e.target.value)}
+        />
       </Field>
 
       <Field label="Website">

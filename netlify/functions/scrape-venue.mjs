@@ -23,6 +23,8 @@ const MAX_SUBPAGES = 4; // extra pages fetched beyond the homepage
 const PER_PAGE_CHARS = 20_000; // cap on each page's text
 const MAX_COMBINED_CHARS = 90_000; // overall cap on text sent to Claude
 const PAGE_TIMEOUT_MS = 6_000; // per-fetch timeout so one slow page can't hang us
+const HOME_TIMEOUT_MS = 8_000; // homepage fetch timeout (fatal if it hangs)
+const CLAUDE_TIMEOUT_MS = 18_000; // Claude API timeout
 
 // Link-relevance keywords (matched against pathname + anchor text). Higher = more
 // likely to be a rooms/experiences page.
@@ -237,17 +239,25 @@ export async function handler(event) {
 
   // 1. Fetch the homepage (this one's failure is fatal — it's all we have).
   let homeHtml;
-  try {
-    const res = await fetch(target.toString(), {
-      headers: { 'User-Agent': 'ImmersiveKit-VenueWizard/1.0 (+https://immersivekit.ca)' },
-      redirect: 'follow',
-    });
-    if (!res.ok) {
-      return json(502, { ok: false, error: `Site returned HTTP ${res.status} while fetching.` });
+  {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HOME_TIMEOUT_MS);
+    try {
+      const res = await fetch(target.toString(), {
+        headers: { 'User-Agent': 'ImmersiveKit-VenueWizard/1.0 (+https://immersivekit.ca)' },
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        return json(502, { ok: false, error: `Site returned HTTP ${res.status} while fetching.` });
+      }
+      homeHtml = await res.text();
+    } catch (err) {
+      const msg = err?.name === 'AbortError' ? 'Site took too long to respond (timeout).' : err.message;
+      return json(502, { ok: false, error: `Could not reach the site: ${msg}` });
+    } finally {
+      clearTimeout(timer);
     }
-    homeHtml = await res.text();
-  } catch (err) {
-    return json(502, { ok: false, error: `Could not reach the site: ${err.message}` });
   }
 
   // 2. Discover + fetch likely sub-pages (best-effort; failures are skipped).
@@ -283,28 +293,36 @@ export async function handler(event) {
 
   // 4. Ask Claude to extract structured data.
   let claudeRes;
-  try {
-    claudeRes = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: process.env.CLAUDE_MODEL || DEFAULT_MODEL,
-        max_tokens: 3072,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: `Homepage URL: ${target.toString()}\nPages scanned: ${scannedPages.length}\n\n${combined}`,
-          },
-        ],
-      }),
-    });
-  } catch (err) {
-    return json(502, { ok: false, error: `Claude request failed: ${err.message}` });
+  {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CLAUDE_TIMEOUT_MS);
+    try {
+      claudeRes = await fetch(ANTHROPIC_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: process.env.CLAUDE_MODEL || DEFAULT_MODEL,
+          max_tokens: 3072,
+          system: SYSTEM_PROMPT,
+          messages: [
+            {
+              role: 'user',
+              content: `Homepage URL: ${target.toString()}\nPages scanned: ${scannedPages.length}\n\n${combined}`,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      const msg = err?.name === 'AbortError' ? 'Claude took too long to respond (timeout).' : err.message;
+      return json(502, { ok: false, error: `Claude request failed: ${msg}` });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   if (!claudeRes.ok) {

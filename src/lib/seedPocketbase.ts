@@ -131,32 +131,33 @@ export async function seedVenue(
     throw new Error(`Created the venue, but failed to create its project — ${describeError(err)}`);
   }
 
-  // 4. Experiences (one per room; link to the project).
-  const experienceIds: string[] = [];
-  for (const room of intel.rooms) {
-    try {
-      const exp = await pb.collection('experiences').create(
-        withOptional(
-          {
-            [EXPERIENCE_LINK_FIELD]: projectId,
-            title: room.title,
-            premise: room.premise,
-            guest_journey: '',
-            duration_minutes: room.durationMinutes || null,
-            capacity_min: room.capacityMin || null,
-            capacity_max: room.capacityMax || null,
-            design_parameters: { onboardedVia: 'venue-intelligence-wizard' },
-          },
-          { status: EXPERIENCE_STATUS }
-        )
-      );
-      experienceIds.push(exp.id);
-    } catch (err) {
-      throw new Error(
-        `Created the venue and project, but failed on room "${room.title}" — ${describeError(err)}`
-      );
-    }
-  }
+  // 4. Experiences (one per room; link to the project — seeded in parallel).
+  const experienceIds = await Promise.all(
+    intel.rooms.map(async (room) => {
+      try {
+        const exp = await pb.collection('experiences').create(
+          withOptional(
+            {
+              [EXPERIENCE_LINK_FIELD]: projectId,
+              title: room.title,
+              premise: room.premise,
+              guest_journey: '',
+              duration_minutes: room.durationMinutes || null,
+              capacity_min: room.capacityMin || null,
+              capacity_max: room.capacityMax || null,
+              design_parameters: { onboardedVia: 'venue-intelligence-wizard' },
+            },
+            { status: EXPERIENCE_STATUS }
+          )
+        );
+        return exp.id;
+      } catch (err) {
+        throw new Error(
+          `Created the venue and project, but failed on room "${room.title}" — ${describeError(err)}`
+        );
+      }
+    })
+  );
 
   return { organizationId, membershipId, projectId, experienceIds };
 }

@@ -45,16 +45,26 @@ export default function RoomsStep({ rooms, booking, autoDetected, onChange, onBa
           <div>
             {booking?.detected ? (
               <>
-                We couldn't read your rooms automatically — they're managed in{' '}
-                <span className="font-medium">{booking?.name}</span>, which our scan can't see inside.
-                Add them below. Tip: go back and paste your {booking?.name} booking page URL to try
-                auto-filling.
+                <p className="font-medium text-amber-100">
+                  Your rooms are inside {booking.name}, which our scan can't read directly.
+                </p>
+                <p className="mt-1">
+                  Open your {booking.name} booking page in another tab and copy each room's{' '}
+                  <span className="font-medium">title</span>,{' '}
+                  <span className="font-medium">group size</span>, and{' '}
+                  <span className="font-medium">duration</span> into the fields below. A short{' '}
+                  <span className="font-medium">premise</span> sentence from each room page makes
+                  the venue feel real. Usually a couple of minutes for 5–6 rooms.
+                </p>
               </>
             ) : (
               <>
-                We couldn't read your rooms automatically — they're often inside a booking widget our
-                scan can't see into. Add them below, or go back and paste your booking page URL under
-                "Advanced".
+                <p className="font-medium text-amber-100">We couldn't auto-detect your rooms.</p>
+                <p className="mt-1">
+                  Most often this is because they live in a booking widget our scan can't see into
+                  (Off The Couch, Bookeo, Resova, etc.). Add them below — title, group size, and
+                  duration are the essentials.
+                </p>
               </>
             )}
           </div>
